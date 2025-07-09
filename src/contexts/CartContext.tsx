@@ -1,6 +1,8 @@
 
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from './AuthContext';
 
 export interface CartItem {
   id: string;
@@ -15,128 +17,191 @@ interface CartState {
   items: CartItem[];
   total: number;
   itemCount: number;
+  loading: boolean;
 }
 
 interface CartContextType extends CartState {
-  addItem: (item: Omit<CartItem, 'quantity'>) => void;
-  removeItem: (id: string) => void;
-  updateQuantity: (id: string, quantity: number) => void;
-  clearCart: () => void;
+  addItem: (item: Omit<CartItem, 'quantity'>) => Promise<void>;
+  removeItem: (id: string) => Promise<void>;
+  updateQuantity: (id: string, quantity: number) => Promise<void>;
+  clearCart: () => Promise<void>;
+  syncCart: () => Promise<void>;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 type CartAction =
-  | { type: 'ADD_ITEM'; payload: Omit<CartItem, 'quantity'> }
-  | { type: 'REMOVE_ITEM'; payload: string }
-  | { type: 'UPDATE_QUANTITY'; payload: { id: string; quantity: number } }
-  | { type: 'CLEAR_CART' }
-  | { type: 'LOAD_CART'; payload: CartItem[] };
+  | { type: 'SET_ITEMS'; payload: CartItem[] }
+  | { type: 'SET_LOADING'; payload: boolean }
+  | { type: 'CLEAR_CART' };
 
 const cartReducer = (state: CartState, action: CartAction): CartState => {
   switch (action.type) {
-    case 'ADD_ITEM': {
-      const existingItem = state.items.find(item => item.id === action.payload.id);
-      
-      if (existingItem) {
-        const newQuantity = Math.min(existingItem.quantity + 1, action.payload.stock);
-        const updatedItems = state.items.map(item =>
-          item.id === action.payload.id
-            ? { ...item, quantity: newQuantity }
-            : item
-        );
-        
-        const total = updatedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-        const itemCount = updatedItems.reduce((sum, item) => sum + item.quantity, 0);
-        
-        return { items: updatedItems, total, itemCount };
-      } else {
-        const newItem = { ...action.payload, quantity: 1 };
-        const updatedItems = [...state.items, newItem];
-        const total = updatedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-        const itemCount = updatedItems.reduce((sum, item) => sum + item.quantity, 0);
-        
-        return { items: updatedItems, total, itemCount };
-      }
-    }
-    
-    case 'REMOVE_ITEM': {
-      const updatedItems = state.items.filter(item => item.id !== action.payload);
-      const total = updatedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-      const itemCount = updatedItems.reduce((sum, item) => sum + item.quantity, 0);
-      
-      return { items: updatedItems, total, itemCount };
-    }
-    
-    case 'UPDATE_QUANTITY': {
-      const updatedItems = state.items.map(item =>
-        item.id === action.payload.id
-          ? { ...item, quantity: Math.min(Math.max(action.payload.quantity, 0), item.stock) }
-          : item
-      ).filter(item => item.quantity > 0);
-      
-      const total = updatedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-      const itemCount = updatedItems.reduce((sum, item) => sum + item.quantity, 0);
-      
-      return { items: updatedItems, total, itemCount };
-    }
-    
-    case 'CLEAR_CART':
-      return { items: [], total: 0, itemCount: 0 };
-    
-    case 'LOAD_CART': {
+    case 'SET_ITEMS': {
       const total = action.payload.reduce((sum, item) => sum + (item.price * item.quantity), 0);
       const itemCount = action.payload.reduce((sum, item) => sum + item.quantity, 0);
-      
-      return { items: action.payload, total, itemCount };
+      return { ...state, items: action.payload, total, itemCount };
     }
-    
+    case 'SET_LOADING':
+      return { ...state, loading: action.payload };
+    case 'CLEAR_CART':
+      return { items: [], total: 0, itemCount: 0, loading: false };
     default:
       return state;
   }
 };
 
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [state, dispatch] = useReducer(cartReducer, { items: [], total: 0, itemCount: 0 });
+  const [state, dispatch] = useReducer(cartReducer, { 
+    items: [], 
+    total: 0, 
+    itemCount: 0, 
+    loading: false 
+  });
+  const { user, loading: authLoading } = useAuth();
 
-  // Load cart from localStorage on mount
+  // Sync cart when user changes
   useEffect(() => {
-    const savedCart = localStorage.getItem('quickcart');
-    if (savedCart) {
-      try {
-        const parsedCart = JSON.parse(savedCart);
-        dispatch({ type: 'LOAD_CART', payload: parsedCart });
-      } catch (error) {
-        console.error('Error loading cart from localStorage:', error);
+    if (!authLoading) {
+      if (user) {
+        syncCart();
+      } else {
+        dispatch({ type: 'CLEAR_CART' });
       }
     }
-  }, []);
+  }, [user, authLoading]);
 
-  // Save cart to localStorage whenever it changes
-  useEffect(() => {
-    localStorage.setItem('quickcart', JSON.stringify(state.items));
-  }, [state.items]);
+  const syncCart = async () => {
+    if (!user) return;
 
-  const addItem = (item: Omit<CartItem, 'quantity'>) => {
-    dispatch({ type: 'ADD_ITEM', payload: item });
-    toast.success(`${item.name} added to cart`);
-  };
+    dispatch({ type: 'SET_LOADING', payload: true });
+    
+    try {
+      const { data: cartData, error } = await supabase
+        .from('cart')
+        .select(`
+          id,
+          quantity,
+          product_id,
+          products (
+            id,
+            name,
+            price,
+            image_url,
+            stock_quantity
+          )
+        `)
+        .eq('user_id', user.id);
 
-  const removeItem = (id: string) => {
-    const item = state.items.find(item => item.id === id);
-    dispatch({ type: 'REMOVE_ITEM', payload: id });
-    if (item) {
-      toast.success(`${item.name} removed from cart`);
+      if (error) throw error;
+
+      const cartItems: CartItem[] = cartData?.map(item => ({
+        id: item.product_id,
+        name: item.products.name,
+        price: Number(item.products.price),
+        image: item.products.image_url || '',
+        quantity: item.quantity,
+        stock: item.products.stock_quantity
+      })) || [];
+
+      dispatch({ type: 'SET_ITEMS', payload: cartItems });
+    } catch (error) {
+      console.error('Error syncing cart:', error);
+      toast.error('Failed to sync cart');
+    } finally {
+      dispatch({ type: 'SET_LOADING', payload: false });
     }
   };
 
-  const updateQuantity = (id: string, quantity: number) => {
-    dispatch({ type: 'UPDATE_QUANTITY', payload: { id, quantity } });
+  const addItem = async (item: Omit<CartItem, 'quantity'>) => {
+    if (!user) {
+      toast.error('Please sign in to add items to cart');
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('cart')
+        .upsert({
+          user_id: user.id,
+          product_id: item.id,
+          quantity: 1
+        }, {
+          onConflict: 'user_id,product_id',
+          ignoreDuplicates: false
+        });
+
+      if (error) throw error;
+
+      await syncCart();
+      toast.success(`${item.name} added to cart`);
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+      toast.error('Failed to add item to cart');
+    }
   };
 
-  const clearCart = () => {
-    dispatch({ type: 'CLEAR_CART' });
-    toast.success('Cart cleared');
+  const removeItem = async (productId: string) => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from('cart')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('product_id', productId);
+
+      if (error) throw error;
+
+      await syncCart();
+      toast.success('Item removed from cart');
+    } catch (error) {
+      console.error('Error removing from cart:', error);
+      toast.error('Failed to remove item from cart');
+    }
+  };
+
+  const updateQuantity = async (productId: string, quantity: number) => {
+    if (!user) return;
+
+    if (quantity <= 0) {
+      await removeItem(productId);
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('cart')
+        .update({ quantity })
+        .eq('user_id', user.id)
+        .eq('product_id', productId);
+
+      if (error) throw error;
+
+      await syncCart();
+    } catch (error) {
+      console.error('Error updating quantity:', error);
+      toast.error('Failed to update quantity');
+    }
+  };
+
+  const clearCart = async () => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from('cart')
+        .delete()
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      dispatch({ type: 'CLEAR_CART' });
+      toast.success('Cart cleared');
+    } catch (error) {
+      console.error('Error clearing cart:', error);
+      toast.error('Failed to clear cart');
+    }
   };
 
   return (
@@ -145,7 +210,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       addItem,
       removeItem,
       updateQuantity,
-      clearCart
+      clearCart,
+      syncCart
     }}>
       {children}
     </CartContext.Provider>

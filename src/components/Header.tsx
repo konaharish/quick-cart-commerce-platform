@@ -1,12 +1,19 @@
 
 import React, { useState } from 'react';
-import { Search, ShoppingCart, Menu, User, Heart } from 'lucide-react';
+import { Search, ShoppingCart, Menu, User, Heart, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useCart } from '@/contexts/CartContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
 import CartDrawer from './CartDrawer';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -14,6 +21,7 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
   const { itemCount } = useCart();
+  const { user, signOut } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [cartOpen, setCartOpen] = useState(false);
   const navigate = useNavigate();
@@ -23,6 +31,11 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
     if (searchQuery.trim()) {
       navigate(`/?search=${encodeURIComponent(searchQuery.trim())}`);
     }
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/');
   };
 
   return (
@@ -73,12 +86,34 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
               </Button>
 
               {/* Account */}
-              <Link to="/auth">
-                <Button variant="ghost" size="sm">
-                  <User className="h-5 w-5" />
-                  <span className="ml-2 hidden md:inline">Account</span>
-                </Button>
-              </Link>
+              {user ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm">
+                      <User className="h-5 w-5" />
+                      <span className="ml-2 hidden md:inline">
+                        {user.email?.split('@')[0]}
+                      </span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => navigate('/orders')}>
+                      My Orders
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleSignOut}>
+                      <LogOut className="h-4 w-4 mr-2" />
+                      Sign Out
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <Link to="/auth">
+                  <Button variant="ghost" size="sm">
+                    <User className="h-5 w-5" />
+                    <span className="ml-2 hidden md:inline">Sign In</span>
+                  </Button>
+                </Link>
+              )}
 
               {/* Cart */}
               <Button

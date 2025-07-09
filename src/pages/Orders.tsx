@@ -6,70 +6,70 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
-// Mock order data
-const mockOrders = [
-  {
-    id: 'ORD-001',
-    date: '2024-01-15',
-    status: 'delivered',
-    total: 1299.99,
-    items: [
-      {
-        id: '1',
-        name: 'iPhone 15 Pro Max',
-        price: 1199.99,
-        quantity: 1,
-        image: 'https://images.unsplash.com/photo-1592750475338-74b7b21085ab?w=400&h=400&fit=crop'
-      }
-    ],
-    tracking: 'TRK123456789',
-    deliveryDate: '2024-01-18'
-  },
-  {
-    id: 'ORD-002',
-    date: '2024-01-20',
-    status: 'shipping',
-    total: 849.99,
-    items: [
-      {
-        id: '7',
-        name: 'Apple Watch Series 9',
-        price: 399.99,
-        quantity: 1,
-        image: 'https://images.unsplash.com/photo-1546868871-7041f2a55e12?w=400&h=400&fit=crop'
-      },
-      {
-        id: '9',
-        name: 'AirPods Pro (2nd Gen)',
-        price: 249.99,
-        quantity: 1,
-        image: 'https://images.unsplash.com/photo-1600294037681-c80b4cb5b434?w=400&h=400&fit=crop'
-      }
-    ],
-    tracking: 'TRK987654321',
-    estimatedDelivery: '2024-01-25'
-  },
-  {
-    id: 'ORD-003',
-    date: '2024-01-22',
-    status: 'processing',
-    total: 2499.99,
-    items: [
-      {
-        id: '4',
-        name: 'MacBook Pro 16" M3 Pro',
-        price: 2499.99,
-        quantity: 1,
-        image: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=400&h=400&fit=crop'
-      }
-    ],
-    estimatedShipping: '2024-01-25'
-  }
-];
+interface OrderItem {
+  id: string;
+  quantity: number;
+  price: number;
+  products: {
+    id: string;
+    name: string;
+    image_url: string;
+  };
+}
+
+interface Order {
+  id: string;
+  created_at: string;
+  status: string;
+  total_amount: number;
+  delivery_date?: string;
+  order_items: OrderItem[];
+}
 
 const Orders: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const { data: orders = [], isLoading } = useQuery({
+    queryKey: ['orders', user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          id,
+          created_at,
+          status,
+          total_amount,
+          delivery_date,
+          order_items (
+            id,
+            quantity,
+            price,
+            products (
+              id,
+              name,
+              image_url
+            )
+          )
+        `)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching orders:', error);
+        throw error;
+      }
+
+      return data as Order[] || [];
+    },
+    enabled: !!user
+  });
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -92,12 +92,34 @@ const Orders: React.FC = () => {
         return <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">Shipping</Badge>;
       case 'processing':
         return <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">Processing</Badge>;
+      case 'pending':
+        return <Badge className="bg-orange-100 text-orange-800 hover:bg-orange-100">Pending</Badge>;
       default:
         return <Badge variant="secondary">Unknown</Badge>;
     }
   };
 
-  if (mockOrders.length === 0) {
+  if (!user) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-16 text-center">
+        <Package className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+        <h1 className="text-2xl font-bold mb-4">Please sign in</h1>
+        <p className="text-gray-600 mb-6">Sign in to view your order history</p>
+        <Button onClick={() => navigate('/auth')}>Sign In</Button>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-16 text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600 mx-auto"></div>
+        <p className="mt-4 text-gray-600">Loading your orders...</p>
+      </div>
+    );
+  }
+
+  if (orders.length === 0) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-16 text-center">
         <Package className="h-16 w-16 text-gray-300 mx-auto mb-4" />
@@ -116,23 +138,23 @@ const Orders: React.FC = () => {
       </div>
 
       <div className="space-y-6">
-        {mockOrders.map((order) => (
+        {orders.map((order) => (
           <Card key={order.id} className="shadow-sm">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-4">
                   {getStatusIcon(order.status)}
                   <div>
-                    <CardTitle className="text-lg">Order {order.id}</CardTitle>
+                    <CardTitle className="text-lg">Order #{order.id.slice(0, 8)}</CardTitle>
                     <p className="text-sm text-gray-500">
-                      Placed on {new Date(order.date).toLocaleDateString()}
+                      Placed on {new Date(order.created_at).toLocaleDateString()}
                     </p>
                   </div>
                 </div>
                 <div className="text-right">
                   {getStatusBadge(order.status)}
                   <p className="text-lg font-semibold mt-1">
-                    ${order.total.toFixed(2)}
+                    ${Number(order.total_amount).toFixed(2)}
                   </p>
                 </div>
               </div>
@@ -141,17 +163,17 @@ const Orders: React.FC = () => {
             <CardContent className="space-y-4">
               {/* Order Items */}
               <div className="space-y-3">
-                {order.items.map((item) => (
+                {order.order_items.map((item) => (
                   <div key={item.id} className="flex items-center space-x-4">
                     <img
-                      src={item.image}
-                      alt={item.name}
+                      src={item.products.image_url || 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=400&h=400&fit=crop'}
+                      alt={item.products.name}
                       className="w-16 h-16 object-cover rounded-md"
                     />
                     <div className="flex-1">
-                      <h4 className="font-medium text-gray-900">{item.name}</h4>
+                      <h4 className="font-medium text-gray-900">{item.products.name}</h4>
                       <p className="text-sm text-gray-500">
-                        Quantity: {item.quantity} • ${item.price.toFixed(2)}
+                        Quantity: {item.quantity} • ${Number(item.price).toFixed(2)}
                       </p>
                     </div>
                   </div>
@@ -160,24 +182,13 @@ const Orders: React.FC = () => {
 
               <Separator />
 
-              {/* Order Status Details */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="flex justify-between">
                 <div>
-                  {order.status === 'delivered' && (
+                  {order.status === 'delivered' && order.delivery_date && (
                     <div>
                       <p className="text-sm font-medium text-gray-900">Delivered</p>
                       <p className="text-sm text-gray-500">
-                        {new Date(order.deliveryDate!).toLocaleDateString()}
-                      </p>
-                    </div>
-                  )}
-                  
-                  {order.status === 'shipping' && (
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">Tracking Number</p>
-                      <p className="text-sm text-gray-500">{order.tracking}</p>
-                      <p className="text-sm text-gray-500 mt-1">
-                        Estimated delivery: {new Date(order.estimatedDelivery!).toLocaleDateString()}
+                        {new Date(order.delivery_date).toLocaleDateString()}
                       </p>
                     </div>
                   )}
@@ -186,35 +197,18 @@ const Orders: React.FC = () => {
                     <div>
                       <p className="text-sm font-medium text-gray-900">Processing</p>
                       <p className="text-sm text-gray-500">
-                        Estimated shipping: {new Date(order.estimatedShipping!).toLocaleDateString()}
+                        Your order is being prepared
                       </p>
                     </div>
                   )}
                 </div>
 
-                <div className="flex justify-end space-x-2">
-                  {order.status === 'shipping' && (
-                    <Button variant="outline" size="sm">
-                      Track Package
-                    </Button>
-                  )}
-                  
-                  {order.status === 'delivered' && (
-                    <>
-                      <Button variant="outline" size="sm">
-                        Return Item
-                      </Button>
-                      <Button variant="outline" size="sm">
-                        Leave Review
-                      </Button>
-                    </>
-                  )}
-                  
+                <div className="flex space-x-2">
                   <Button variant="outline" size="sm">
                     View Details
                   </Button>
                   
-                  <Button size="sm">
+                  <Button size="sm" onClick={() => navigate('/')}>
                     Buy Again
                   </Button>
                 </div>
@@ -222,11 +216,6 @@ const Orders: React.FC = () => {
             </CardContent>
           </Card>
         ))}
-      </div>
-
-      {/* Load More */}
-      <div className="text-center mt-8">
-        <Button variant="outline">Load More Orders</Button>
       </div>
     </div>
   );

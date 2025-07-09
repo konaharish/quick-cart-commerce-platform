@@ -1,13 +1,12 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Eye, EyeOff, ShoppingCart } from 'lucide-react';
-import { toast } from 'sonner';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Auth: React.FC = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -20,6 +19,16 @@ const Auth: React.FC = () => {
     firstName: '',
     lastName: ''
   });
+
+  const { user, signIn, signUp } = useAuth();
+  const navigate = useNavigate();
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (user) {
+      navigate('/');
+    }
+  }, [user, navigate]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData(prev => ({
@@ -34,34 +43,37 @@ const Auth: React.FC = () => {
 
     // Basic validation
     if (!formData.email || !formData.password) {
-      toast.error('Please fill in all required fields');
       setIsLoading(false);
       return;
     }
 
     if (!isLogin) {
       if (formData.password !== formData.confirmPassword) {
-        toast.error('Passwords do not match');
         setIsLoading(false);
         return;
       }
       if (!formData.firstName || !formData.lastName) {
-        toast.error('Please fill in all required fields');
         setIsLoading(false);
         return;
       }
     }
 
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
       if (isLogin) {
-        toast.success('Logged in successfully!');
+        const { error } = await signIn(formData.email, formData.password);
+        if (!error) {
+          navigate('/');
+        }
       } else {
-        toast.success('Account created successfully!');
+        const fullName = `${formData.firstName} ${formData.lastName}`;
+        const { error } = await signUp(formData.email, formData.password, fullName);
+        if (!error) {
+          // Keep them on the auth page to show the verification message
+        }
       }
-      // In real app, redirect to dashboard or previous page
-    }, 1500);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

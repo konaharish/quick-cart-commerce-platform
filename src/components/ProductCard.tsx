@@ -1,14 +1,14 @@
 
 import React from 'react';
-import { Star, ShoppingCart, Eye, Heart } from 'lucide-react';
+import { Star, ShoppingCart, Heart } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
 import { useCart } from '@/contexts/CartContext';
-import { Link } from 'react-router-dom';
-import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
+import { Link, useNavigate } from 'react-router-dom';
 
-export interface Product {
+interface ProductCardProps {
   id: string;
   name: string;
   description: string;
@@ -18,164 +18,222 @@ export interface Product {
   rating: number;
   reviewCount: number;
   stock: number;
-  category: string;
-  isNew?: boolean;
   isFeatured?: boolean;
-  specifications?: Record<string, string>;
+  isNewRelease?: boolean;
 }
 
-interface ProductCardProps {
-  product: Product;
-}
+const ProductCard: React.FC<ProductCardProps> = ({
+  id,
+  name,
+  description,
+  price,
+  originalPrice,
+  image,
+  rating,
+  reviewCount,
+  stock,
+  isFeatured,
+  isNewRelease,
+}) => {
+  const { addItem, items, updateQuantity } = useCart();
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  
+  const cartItem = items.find(item => item.id === id);
+  const isInCart = !!cartItem;
+  const isOutOfStock = stock <= 0;
 
-const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
-  const { addItem, items } = useCart();
-  const cartItem = items.find(item => item.id === product.id);
-  const isInCart = Boolean(cartItem);
-
-  const handleAddToCart = (e: React.MouseEvent) => {
+  const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     
-    if (product.stock === 0) {
-      toast.error('Product is out of stock');
+    if (!user) {
+      navigate('/auth');
       return;
     }
 
-    addItem({
-      id: product.id,
-      name: product.name,
-      price: product.price,
-      image: product.image,
-      stock: product.stock
+    if (isOutOfStock) return;
+
+    await addItem({
+      id,
+      name,
+      price,
+      image,
+      stock
     });
   };
 
-  const discountPercentage = product.originalPrice 
-    ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
-    : 0;
+  const handleQuantityChange = async (e: React.MouseEvent, newQuantity: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!user) return;
+    
+    await updateQuantity(id, newQuantity);
+  };
+
+  const handleShopNow = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    navigate(`/product/${id}`);
+  };
+
+  const discount = originalPrice ? Math.round(((originalPrice - price) / originalPrice) * 100) : 0;
 
   return (
-    <Card className="group hover:shadow-lg transition-all duration-300 border-0 shadow-sm hover:shadow-xl relative overflow-hidden">
-      <div className="relative">
-        {/* Badges */}
-        <div className="absolute top-2 left-2 z-10 flex flex-col gap-1">
-          {product.isNew && (
-            <Badge className="bg-green-500 hover:bg-green-600 text-white">
-              New
-            </Badge>
-          )}
-          {discountPercentage > 0 && (
-            <Badge variant="destructive">
-              -{discountPercentage}%
-            </Badge>
-          )}
-          {product.stock === 0 && (
-            <Badge variant="secondary">
-              Out of Stock
-            </Badge>
-          )}
-        </div>
-
-        {/* Wishlist button */}
-        <Button
-          size="sm"
-          variant="ghost"
-          className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 hover:bg-white"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            toast.success('Added to wishlist');
-          }}
-        >
-          <Heart className="h-4 w-4" />
-        </Button>
-
-        {/* Product Image */}
-        <Link to={`/product/${product.id}`}>
-          <div className="aspect-square overflow-hidden bg-gray-50">
-            <img
-              src={product.image}
-              alt={product.name}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-            />
-          </div>
-        </Link>
-      </div>
-
-      <CardContent className="p-4">
-        <Link to={`/product/${product.id}`}>
-          <div className="space-y-2">
-            {/* Product Name */}
-            <h3 className="font-medium text-sm text-gray-900 line-clamp-2 group-hover:text-brand-600 transition-colors">
-              {product.name}
-            </h3>
-
-            {/* Rating */}
-            <div className="flex items-center space-x-1">
-              <div className="flex items-center">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Star
-                    key={i}
-                    className={`h-3 w-3 ${
-                      i < Math.floor(product.rating)
-                        ? 'text-yellow-400 fill-current'
-                        : 'text-gray-300'
-                    }`}
-                  />
-                ))}
-              </div>
-              <span className="text-xs text-gray-500">
-                ({product.reviewCount})
-              </span>
-            </div>
-
-            {/* Price */}
-            <div className="flex items-center space-x-2">
-              <span className="text-lg font-bold text-gray-900">
-                ${product.price.toFixed(2)}
-              </span>
-              {product.originalPrice && (
-                <span className="text-sm text-gray-500 line-through">
-                  ${product.originalPrice.toFixed(2)}
-                </span>
-              )}
-            </div>
-
-            {/* Stock status */}
-            <div className="text-xs text-gray-500">
-              {product.stock > 0 ? (
-                product.stock < 10 ? (
-                  <span className="text-orange-600">Only {product.stock} left</span>
-                ) : (
-                  <span className="text-green-600">In Stock</span>
-                )
-              ) : (
-                <span className="text-red-600">Out of Stock</span>
-              )}
-            </div>
-          </div>
-        </Link>
-
-        {/* Action Buttons */}
-        <div className="flex items-center space-x-2 mt-4">
-          <Button
-            size="sm"
-            className="flex-1"
-            onClick={handleAddToCart}
-            disabled={product.stock === 0}
-          >
-            <ShoppingCart className="h-4 w-4 mr-2" />
-            {isInCart ? `In Cart (${cartItem?.quantity})` : 'Add to Cart'}
-          </Button>
+    <Card className="group hover:shadow-lg transition-all duration-300 h-full flex flex-col">
+      <Link to={`/product/${id}`} className="flex-1 flex flex-col">
+        <div className="relative overflow-hidden rounded-t-lg">
+          <img
+            src={image}
+            alt={name}
+            className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+          />
           
-          <Link to={`/product/${product.id}`}>
-            <Button size="sm" variant="outline">
-              <Eye className="h-4 w-4" />
-            </Button>
-          </Link>
+          {/* Badges */}
+          <div className="absolute top-2 left-2 flex flex-col gap-1">
+            {isNewRelease && (
+              <Badge className="bg-green-500 hover:bg-green-600 text-white">
+                New
+              </Badge>
+            )}
+            {isFeatured && (
+              <Badge className="bg-blue-500 hover:bg-blue-600 text-white">
+                Featured
+              </Badge>
+            )}
+            {discount > 0 && (
+              <Badge className="bg-red-500 hover:bg-red-600 text-white">
+                -{discount}%
+              </Badge>
+            )}
+          </div>
+
+          {/* Wishlist Button */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 hover:bg-white"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+          >
+            <Heart className="h-4 w-4" />
+          </Button>
+
+          {/* Stock Status */}
+          {isOutOfStock && (
+            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+              <Badge variant="destructive" className="text-white">
+                Out of Stock
+              </Badge>
+            </div>
+          )}
         </div>
-      </CardContent>
+
+        <CardContent className="p-4 flex-1 flex flex-col">
+          <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2 group-hover:text-brand-600 transition-colors">
+            {name}
+          </h3>
+          
+          <p className="text-sm text-gray-600 mb-3 line-clamp-2 flex-1">
+            {description}
+          </p>
+
+          {/* Price */}
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-lg font-bold text-gray-900">
+              ${price.toFixed(2)}
+            </span>
+            {originalPrice && originalPrice > price && (
+              <span className="text-sm text-gray-500 line-through">
+                ${originalPrice.toFixed(2)}
+              </span>
+            )}
+          </div>
+
+          {/* Rating */}
+          <div className="flex items-center gap-1 mb-4">
+            <div className="flex">
+              {[...Array(5)].map((_, i) => (
+                <Star
+                  key={i}
+                  className={`h-4 w-4 ${
+                    i < Math.floor(rating)
+                      ? 'text-yellow-400 fill-current'
+                      : 'text-gray-300'
+                  }`}
+                />
+              ))}
+            </div>
+            <span className="text-sm text-gray-600">
+              {rating.toFixed(1)} ({reviewCount})
+            </span>
+          </div>
+
+          {/* Stock Info */}
+          <div className="mb-4">
+            <span className="text-sm text-gray-600">
+              {stock > 0 ? `${stock} in stock` : 'Out of stock'}
+            </span>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="space-y-2">
+            {!isOutOfStock && (
+              <>
+                {!isInCart ? (
+                  <Button
+                    onClick={handleAddToCart}
+                    className="w-full"
+                    disabled={isOutOfStock}
+                  >
+                    <ShoppingCart className="h-4 w-4 mr-2" />
+                    Add to Cart
+                  </Button>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => handleQuantityChange(e, cartItem.quantity - 1)}
+                      disabled={cartItem.quantity <= 1}
+                    >
+                      -
+                    </Button>
+                    <span className="font-medium min-w-[2rem] text-center">
+                      {cartItem.quantity}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => handleQuantityChange(e, cartItem.quantity + 1)}
+                      disabled={cartItem.quantity >= stock}
+                    >
+                      +
+                    </Button>
+                  </div>
+                )}
+                
+                <Button
+                  variant="outline"
+                  onClick={handleShopNow}
+                  className="w-full"
+                >
+                  Shop Now
+                </Button>
+              </>
+            )}
+            
+            {isOutOfStock && (
+              <Button variant="outline" disabled className="w-full">
+                Out of Stock
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Link>
     </Card>
   );
 };

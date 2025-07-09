@@ -9,14 +9,17 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { useCart } from '@/contexts/CartContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 const Checkout: React.FC = () => {
   const { items, total, clearCart } = useCart();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
-    email: '',
+    email: user?.email || '',
     firstName: '',
     lastName: '',
     address: '',
@@ -39,10 +42,17 @@ const Checkout: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!user) {
+      toast.error('Please sign in to place an order');
+      navigate('/auth');
+      return;
+    }
+
     setIsLoading(true);
 
     // Basic validation
-    const requiredFields = ['email', 'firstName', 'lastName', 'address', 'city', 'state', 'zipCode', 'cardNumber', 'expiryDate', 'cvv'];
+    const requiredFields = ['firstName', 'lastName', 'address', 'city', 'state', 'zipCode', 'cardNumber', 'expiryDate', 'cvv'];
     const missingFields = requiredFields.filter(field => !formData[field as keyof typeof formData]);
 
     if (missingFields.length > 0) {
@@ -51,14 +61,62 @@ const Checkout: React.FC = () => {
       return;
     }
 
-    // Simulate payment processing
-    setTimeout(() => {
-      setIsLoading(false);
-      toast.success('Order placed successfully!');
-      clearCart();
+    try {
+      // Create order
+      const shippingAddress = `${formData.address}, ${formData.city}, ${formData.state} ${formData.zipCode}`;
+      const shipping = total >= 50 ? 0 : 9.99;
+      const tax = total * 0.08;
+      const finalTotal = total + shipping + tax;
+
+      const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          user_id: user.id,
+          total_amount: finalTotal,
+          status: 'processing',
+          shipping_address: shippingAddress
+        })
+        .select()
+        .single();
+
+      if (orderError) throw orderError;
+
+      // Create order items
+      const orderItems = items.map(item => ({
+        order_id: order.id,
+        product_id: item.id,
+        quantity: item.quantity,
+        price: item.price
+      }));
+
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert(orderItems);
+
+      if (itemsError) throw itemsError;
+
+      // Clear cart
+      await clearCart();
+
+      toast.success('🎉 Order placed successfully! Thank you for your purchase.');
       navigate('/orders');
-    }, 2000);
+    } catch (error) {
+      console.error('Error placing order:', error);
+      toast.error('Failed to place order. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  if (!user) {
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-16 text-center">
+        <h1 className="text-2xl font-bold mb-4">Please sign in</h1>
+        <p className="text-gray-600 mb-6">You need to sign in to access checkout</p>
+        <Button onClick={() => navigate('/auth')}>Sign In</Button>
+      </div>
+    );
+  }
 
   if (items.length === 0) {
     return (
@@ -71,7 +129,7 @@ const Checkout: React.FC = () => {
   }
 
   const shipping = total >= 50 ? 0 : 9.99;  
-  const tax = total * 0.08; // 8% tax
+  const tax = total * 0.08;
   const finalTotal = total + shipping + tax;
 
   return (
@@ -98,6 +156,7 @@ const Checkout: React.FC = () => {
                   required
                   value={formData.email}
                   onChange={handleInputChange}
+                  disabled={!!user?.email}
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -167,17 +226,13 @@ const Checkout: React.FC = () => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="state">State</Label>
-                  <Select name="state" required>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select state" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="CA">California</SelectItem>
-                      <SelectItem value="NY">New York</SelectItem>
-                      <SelectItem value="TX">Texas</SelectItem>
-                      <SelectItem value="FL">Florida</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Input
+                    id="state"
+                    name="state"
+                    required
+                    value={formData.state}
+                    onChange={handleInputChange}
+                  />
                 </div>
               </div>
               <div className="space-y-2">
