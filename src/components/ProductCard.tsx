@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Star, ShoppingCart, Heart } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -25,6 +26,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
   stock,
   isFeatured,
   isNewRelease,
+  isNew,
 }) => {
   const { addItem, items, updateQuantity } = useCart();
   const { user } = useAuth();
@@ -33,6 +35,10 @@ const ProductCard: React.FC<ProductCardProps> = ({
   const cartItem = items.find(item => item.id === id);
   const isInCart = !!cartItem;
   const isOutOfStock = stock <= 0;
+
+  // Use the props for new/featured status, falling back to the product properties
+  const showAsNew = isNewRelease || isNew;
+  const showAsFeatured = isFeatured;
 
   const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -83,12 +89,12 @@ const ProductCard: React.FC<ProductCardProps> = ({
           
           {/* Badges */}
           <div className="absolute top-2 left-2 flex flex-col gap-1">
-            {isNewRelease && (
+            {showAsNew && (
               <Badge className="bg-green-500 hover:bg-green-600 text-white">
                 New
               </Badge>
             )}
-            {isFeatured && (
+            {showAsFeatured && (
               <Badge className="bg-blue-500 hover:bg-blue-600 text-white">
                 Featured
               </Badge>

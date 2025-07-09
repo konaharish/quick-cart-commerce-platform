@@ -99,7 +99,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         id: item.product_id,
         name: item.products.name,
         price: Number(item.products.price),
-        image: item.products.image_url || '',
+        image: item.products.image_url || 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=400&h=400&fit=crop',
         quantity: item.quantity,
         stock: item.products.stock_quantity
       })) || [];

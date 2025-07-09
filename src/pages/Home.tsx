@@ -1,184 +1,163 @@
 
-import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import ProductCard from '@/components/ProductCard';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Search, Filter } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-
-interface Product {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  original_price?: number;
-  image_url: string;
-  rating: number;
-  review_count: number;
-  stock_quantity: number;
-  is_featured: boolean;
-  is_new_release: boolean;
-}
+import { Star, Truck, Shield, Headphones } from 'lucide-react';
+import ProductCard from '@/components/ProductCard';
+import { Button } from '@/components/ui/button';
+import { fetchProducts } from '@/services/productService';
 
 const Home: React.FC = () => {
-  const [searchParams] = useSearchParams();
-  const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
-  const [selectedCategory, setSelectedCategory] = useState('all');
-
-  const { data: products = [], isLoading } = useQuery({
-    queryKey: ['products', searchQuery, selectedCategory],
-    queryFn: async () => {
-      let query = supabase
-        .from('products')
-        .select('*');
-
-      if (searchQuery) {
-        query = query.or(`name.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`);
-      }
-
-      const { data, error } = await query;
-      
-      if (error) {
-        console.error('Error fetching products:', error);
-        throw error;
-      }
-      
-      return data || [];
-    }
+  const { data: products = [], isLoading, error } = useQuery({
+    queryKey: ['products'],
+    queryFn: fetchProducts
   });
 
-  const { data: categories = [] } = useQuery({
-    queryKey: ['categories'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('categories')
-        .select('*')
-        .order('name');
-      
-      if (error) {
-        console.error('Error fetching categories:', error);
-        throw error;
-      }
-      
-      return data || [];
-    }
-  });
+  const featuredProducts = products.filter(product => product.isFeatured);
+  const newProducts = products.filter(product => product.isNew);
 
-  useEffect(() => {
-    const searchParam = searchParams.get('search');
-    if (searchParam) {
-      setSearchQuery(searchParam);
-    }
-  }, [searchParams]);
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-600"></div>
+      </div>
+    );
+  }
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    // The search will be handled by the query key change
-  };
-
-  const filteredProducts = products.filter(product => {
-    if (selectedCategory === 'all') return true;
-    if (selectedCategory === 'featured') return product.is_featured;
-    if (selectedCategory === 'new') return product.is_new_release;
-    return true;
-  });
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Something went wrong</h2>
+          <p className="text-gray-600">Failed to load products. Please try again later.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="min-h-screen bg-gray-50">
       {/* Hero Section */}
-      <div className="bg-gradient-to-r from-brand-600 to-brand-700 rounded-2xl p-8 mb-8 text-white">
-        <div className="max-w-2xl">
-          <h1 className="text-4xl md:text-5xl font-bold mb-4">
-            Discover Amazing Products
-          </h1>
-          <p className="text-xl mb-6 text-brand-100">
-            Shop the latest electronics, gadgets, and more with unbeatable prices and fast delivery.
-          </p>
-          <form onSubmit={handleSearch} className="flex gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-              <Input
-                type="text"
-                placeholder="Search for products..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 bg-white text-gray-900"
-              />
-            </div>
-            <Button type="submit" variant="secondary">
-              Search
+      <section className="relative bg-gradient-to-r from-brand-600 to-brand-700 text-white py-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center">
+            <h1 className="text-4xl md:text-6xl font-bold mb-6">
+              Welcome to ShopiElectro
+            </h1>
+            <p className="text-xl md:text-2xl mb-8 text-brand-100">
+              Discover the latest in electronics and technology
+            </p>
+            <Button size="lg" className="bg-white text-brand-600 hover:bg-gray-100">
+              Shop Now
             </Button>
-          </form>
+          </div>
         </div>
-      </div>
+      </section>
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-4 mb-8">
-        <Button
-          variant={selectedCategory === 'all' ? 'default' : 'outline'}
-          onClick={() => setSelectedCategory('all')}
-          className="flex items-center gap-2"
-        >
-          <Filter className="h-4 w-4" />
-          All Products
-        </Button>
-        <Button
-          variant={selectedCategory === 'featured' ? 'default' : 'outline'}
-          onClick={() => setSelectedCategory('featured')}
-        >
-          Featured
-        </Button>
-        <Button
-          variant={selectedCategory === 'new' ? 'default' : 'outline'}
-          onClick={() => setSelectedCategory('new')}
-        >
-          New Releases
-        </Button>
-        {categories.map((category) => (
-          <Button
-            key={category.id}
-            variant={selectedCategory === category.slug ? 'default' : 'outline'}
-            onClick={() => setSelectedCategory(category.slug)}
-          >
-            {category.name}
-          </Button>
-        ))}
-      </div>
+      {/* Features Section */}
+      <section className="py-16 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="text-center">
+              <div className="bg-brand-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Truck className="h-8 w-8 text-brand-600" />
+              </div>
+              <h3 className="text-xl font-semibold mb-2">Free Shipping</h3>
+              <p className="text-gray-600">Free shipping on orders over $50</p>
+            </div>
+            <div className="text-center">
+              <div className="bg-brand-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Shield className="h-8 w-8 text-brand-600" />
+              </div>
+              <h3 className="text-xl font-semibold mb-2">Secure Payment</h3>
+              <p className="text-gray-600">Your payment information is safe</p>
+            </div>
+            <div className="text-center">
+              <div className="bg-brand-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Headphones className="h-8 w-8 text-brand-600" />
+              </div>
+              <h3 className="text-xl font-semibold mb-2">24/7 Support</h3>
+              <p className="text-gray-600">Get help whenever you need it</p>
+            </div>
+          </div>
+        </div>
+      </section>
 
-      {/* Products Grid */}
-      {isLoading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-          {[...Array(10)].map((_, i) => (
-            <div key={i} className="bg-gray-200 animate-pulse rounded-lg h-80"></div>
-          ))}
-        </div>
-      ) : filteredProducts.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-          {filteredProducts.map((product) => (
-            <ProductCard
-              key={product.id}
-              id={product.id}
-              name={product.name}
-              description={product.description}
-              price={product.price}
-              originalPrice={product.original_price}
-              image={product.image_url || 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=400&h=400&fit=crop'}
-              rating={product.rating}
-              reviewCount={product.review_count}
-              stock={product.stock_quantity}
-              isFeatured={product.is_featured}
-              isNewRelease={product.is_new_release}
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="text-center py-16">
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">No products found</h3>
-          <p className="text-gray-500">Try adjusting your search or filters</p>
-        </div>
+      {/* Featured Products */}
+      {featuredProducts.length > 0 && (
+        <section className="py-16">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl font-bold text-gray-900 mb-4">Featured Products</h2>
+              <p className="text-gray-600 max-w-2xl mx-auto">
+                Discover our handpicked selection of premium electronics
+              </p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {featuredProducts.slice(0, 8).map((product) => (
+                <ProductCard key={product.id} {...product} />
+              ))}
+            </div>
+          </div>
+        </section>
       )}
+
+      {/* New Arrivals */}
+      {newProducts.length > 0 && (
+        <section className="py-16 bg-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl font-bold text-gray-900 mb-4">New Arrivals</h2>
+              <p className="text-gray-600 max-w-2xl mx-auto">
+                Be the first to experience the latest technology
+              </p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {newProducts.slice(0, 8).map((product) => (
+                <ProductCard key={product.id} {...product} />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* All Products */}
+      <section className="py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">All Products</h2>
+            <p className="text-gray-600 max-w-2xl mx-auto">
+              Browse our complete collection of electronics
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {products.map((product) => (
+              <ProductCard key={product.id} {...product} />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Newsletter Section */}
+      <section className="py-16 bg-brand-600">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className="text-3xl font-bold text-white mb-4">
+            Stay Updated
+          </h2>
+          <p className="text-brand-100 mb-8 max-w-2xl mx-auto">
+            Subscribe to our newsletter and be the first to know about new products and exclusive deals
+          </p>
+          <div className="max-w-md mx-auto flex gap-4">
+            <input
+              type="email"
+              placeholder="Enter your email"
+              className="flex-1 px-4 py-3 rounded-lg border-0 focus:ring-2 focus:ring-white"
+            />
+            <Button className="bg-white text-brand-600 hover:bg-gray-100">
+              Subscribe
+            </Button>
+          </div>
+        </div>
+      </section>
     </div>
   );
 };
