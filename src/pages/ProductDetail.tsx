@@ -262,7 +262,7 @@ const ProductDetail: React.FC = () => {
               {Object.entries(product.specifications).map(([key, value]) => (
                 <div key={key} className="flex justify-between py-2 border-b border-gray-100 last:border-b-0">
                   <span className="font-medium text-gray-700">{key}:</span>
-                  <span className="text-gray-900">{value}</span>
+                  <span className="text-gray-900">{String(value)}</span>
                 </div>
               ))}
             </div>

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Star, ShoppingCart, Heart } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -7,17 +6,9 @@ import { Badge } from '@/components/ui/badge';
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
+import { Product } from '@/types/product';
 
-interface ProductCardProps {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  originalPrice?: number;
-  image: string;
-  rating: number;
-  reviewCount: number;
-  stock: number;
+interface ProductCardProps extends Product {
   isFeatured?: boolean;
   isNewRelease?: boolean;
 }
