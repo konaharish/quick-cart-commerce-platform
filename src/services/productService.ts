@@ -140,3 +140,17 @@ export const fetchProductsByCategory = async (categorySlug: string): Promise<Pro
     specifications: product.specifications as Record<string, string> || {}
   })) || [];
 };
+
+export const fetchCategories = async () => {
+  const { data, error } = await supabase
+    .from('categories')
+    .select('id, name, slug, description')
+    .order('name');
+
+  if (error) {
+    console.error('Error fetching categories:', error);
+    throw error;
+  }
+
+  return data || [];
+};
