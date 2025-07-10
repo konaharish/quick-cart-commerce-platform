@@ -2,7 +2,7 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { ChevronRight, Smartphone, Laptop, Watch, Headphones, Tv, Monitor, Refrigerator, Washer2 } from 'lucide-react';
+import { ChevronRight, Smartphone, Laptop, Watch, Headphones, Tv, Monitor, Refrigerator, WashingMachine } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import ProductCard from '@/components/ProductCard';
@@ -30,7 +30,7 @@ const Home: React.FC = () => {
     'tvs': <Tv className="h-8 w-8" />,
     'computers': <Monitor className="h-8 w-8" />,
     'fridges': <Refrigerator className="h-8 w-8" />,
-    'washing-machines': <Washer2 className="h-8 w-8" />,
+    'washing-machines': <WashingMachine className="h-8 w-8" />,
   };
 
   const featuredProducts = products.filter(product => product.isFeatured).slice(0, 8);
@@ -98,7 +98,7 @@ const Home: React.FC = () => {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {featuredProducts.map((product) => (
-              <ProductCard key={product.id} product={product} />
+              <ProductCard key={product.id} {...product} />
             ))}
           </div>
         </section>
@@ -119,7 +119,7 @@ const Home: React.FC = () => {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {newReleases.map((product) => (
-              <ProductCard key={product.id} product={product} />
+              <ProductCard key={product.id} {...product} />
             ))}
           </div>
         </section>
@@ -133,7 +133,7 @@ const Home: React.FC = () => {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {products.slice(0, 12).map((product) => (
-            <ProductCard key={product.id} product={product} />
+            <ProductCard key={product.id} {...product} />
           ))}
         </div>
         {products.length > 12 && (
