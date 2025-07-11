@@ -62,27 +62,6 @@ const Home: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Categories Section */}
-      <section className="mb-12">
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">Shop by Category</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-          {categories.map((category) => (
-            <Card 
-              key={category.id} 
-              className="cursor-pointer hover:shadow-lg transition-shadow duration-200"
-              onClick={() => handleCategoryClick(category.slug)}
-            >
-              <CardContent className="p-4 text-center">
-                <div className="flex justify-center mb-2 text-brand-600">
-                  {categoryIcons[category.slug] || <Monitor className="h-8 w-8" />}
-                </div>
-                <h3 className="font-medium text-sm text-gray-900">{category.name}</h3>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </section>
-
       {/* Featured Products */}
       {featuredProducts.length > 0 && (
         <section className="mb-12">
