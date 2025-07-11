@@ -3,7 +3,7 @@ import React from 'react';
 import { X, Star, Sparkles, Smartphone, Laptop, Watch, Headphones, Tv, Monitor, ChefHat, WashingMachine } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -25,8 +25,8 @@ const categories = [
 ];
 
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
-  const [searchParams] = useSearchParams();
-  const currentCategory = searchParams.get('category');
+  const location = useLocation();
+  const currentPath = location.pathname;
 
   return (
     <>
@@ -60,12 +60,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           <nav className="space-y-1">
             {categories.map((category) => {
               const Icon = category.icon;
-              const isActive = currentCategory === category.slug;
+              const isActive = currentPath === `/category/${category.slug}`;
               
               return (
                 <Link
                   key={category.slug}
-                  to={`/?category=${category.slug}`}
+                  to={`/category/${category.slug}`}
                   className={cn(
                     "flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors",
                     isActive

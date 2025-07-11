@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useCart } from '@/contexts/CartContext';
+import { useWishlist } from '@/contexts/WishlistContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
 import { Product } from '@/types/product';
@@ -29,12 +30,14 @@ const ProductCard: React.FC<ProductCardProps> = ({
   isNew,
 }) => {
   const { addItem, items, updateQuantity } = useCart();
+  const { isInWishlist, toggleWishlist } = useWishlist();
   const { user } = useAuth();
   const navigate = useNavigate();
   
   const cartItem = items.find(item => item.id === id);
   const isInCart = !!cartItem;
   const isOutOfStock = stock <= 0;
+  const isProductInWishlist = isInWishlist(id);
 
   // Use the props for new/featured status, falling back to the product properties
   const showAsNew = isNewRelease || isNew;
@@ -67,6 +70,18 @@ const ProductCard: React.FC<ProductCardProps> = ({
     if (!user) return;
     
     await updateQuantity(id, newQuantity);
+  };
+
+  const handleWishlistToggle = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!user) {
+      navigate('/auth');
+      return;
+    }
+
+    await toggleWishlist(id);
   };
 
   const handleShopNow = (e: React.MouseEvent) => {
@@ -111,12 +126,11 @@ const ProductCard: React.FC<ProductCardProps> = ({
             variant="ghost"
             size="sm"
             className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 hover:bg-white"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-            }}
+            onClick={handleWishlistToggle}
           >
-            <Heart className="h-4 w-4" />
+            <Heart 
+              className={`h-4 w-4 ${isProductInWishlist ? 'fill-red-500 text-red-500' : ''}`} 
+            />
           </Button>
 
           {/* Stock Status */}
