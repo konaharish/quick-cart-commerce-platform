@@ -80,10 +80,12 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
             {/* Right section */}
             <div className="flex items-center space-x-2">
               {/* Wishlist - Desktop only */}
-              <Button variant="ghost" size="sm" className="hidden sm:flex">
-                <Heart className="h-5 w-5" />
-                <span className="ml-2 hidden md:inline">Wishlist</span>
-              </Button>
+              <Link to="/wishlist">
+                <Button variant="ghost" size="sm" className="hidden sm:flex">
+                  <Heart className="h-5 w-5" />
+                  <span className="ml-2 hidden md:inline">Wishlist</span>
+                </Button>
+              </Link>
 
               {/* Account */}
               {user ? (
