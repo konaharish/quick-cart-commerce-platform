@@ -1,7 +1,7 @@
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ChevronRight, Smartphone, Laptop, Watch, Headphones, Tv, Monitor, Refrigerator, WashingMachine } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -10,6 +10,8 @@ import { fetchProducts, fetchCategories } from '@/services/productService';
 
 const Home: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const searchQuery = searchParams.get('search') || '';
   
   const { data: products = [], isLoading: productsLoading } = useQuery({
     queryKey: ['products'],
@@ -33,8 +35,18 @@ const Home: React.FC = () => {
     'washing-machines': <WashingMachine className="h-8 w-8" />,
   };
 
-  const featuredProducts = products.filter(product => product.isFeatured).slice(0, 8);
-  const newReleases = products.filter(product => product.isNew).slice(0, 8);
+  // Filter products based on search query
+  const filteredProducts = useMemo(() => {
+    if (!searchQuery.trim()) return products;
+    
+    return products.filter(product => 
+      product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      product.description?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [products, searchQuery]);
+
+  const featuredProducts = (searchQuery ? filteredProducts : products).filter(product => product.isFeatured).slice(0, 8);
+  const newReleases = (searchQuery ? filteredProducts : products).filter(product => product.isNew).slice(0, 8);
 
   const handleCategoryClick = (categorySlug: string) => {
     navigate(`/category/${categorySlug}`);
@@ -104,23 +116,37 @@ const Home: React.FC = () => {
         </section>
       )}
 
-      {/* All Products */}
+      {/* Search Results or All Products */}
       <section>
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-gray-900">All Products</h2>
-          <span className="text-sm text-gray-500">{products.length} products</span>
+          <h2 className="text-2xl font-bold text-gray-900">
+            {searchQuery ? `Search Results for "${searchQuery}"` : 'All Products'}
+          </h2>
+          <span className="text-sm text-gray-500">
+            {searchQuery ? filteredProducts.length : products.length} products
+          </span>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {products.slice(0, 12).map((product) => (
-            <ProductCard key={product.id} {...product} />
-          ))}
-        </div>
-        {products.length > 12 && (
-          <div className="text-center mt-8">
-            <Button variant="outline" size="lg">
-              Load More Products
-            </Button>
+        
+        {searchQuery && filteredProducts.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-gray-500 text-lg">No products found for "{searchQuery}"</p>
+            <p className="text-gray-400 mt-2">Try searching with different keywords</p>
           </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {(searchQuery ? filteredProducts : products).slice(0, 12).map((product) => (
+                <ProductCard key={product.id} {...product} />
+              ))}
+            </div>
+            {(searchQuery ? filteredProducts : products).length > 12 && (
+              <div className="text-center mt-8">
+                <Button variant="outline" size="lg">
+                  Load More Products
+                </Button>
+              </div>
+            )}
+          </>
         )}
       </section>
     </div>
