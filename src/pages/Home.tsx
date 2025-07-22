@@ -39,10 +39,41 @@ const Home: React.FC = () => {
   const filteredProducts = useMemo(() => {
     if (!searchQuery.trim()) return products;
     
-    return products.filter(product => 
-      product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      product.description?.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const query = searchQuery.toLowerCase();
+    
+    return products.filter(product => {
+      // Search by product name and description
+      const nameMatch = product.name.toLowerCase().includes(query);
+      const descriptionMatch = product.description?.toLowerCase().includes(query);
+      
+      // Search by category
+      const categoryMatch = product.category?.toLowerCase().includes(query);
+      
+      // Handle special category searches
+      const isBestSellersSearch = (query.includes('best') || query.includes('seller') || query.includes('featured')) && product.isFeatured;
+      const isNewReleasesSearch = (query.includes('new') || query.includes('release') || query.includes('latest')) && product.isNew;
+      
+      // Handle specific category searches
+      const isLaptopsSearch = (query.includes('laptop') || query.includes('computer')) && 
+        (product.category?.toLowerCase().includes('laptop') || product.category?.toLowerCase().includes('computer'));
+      const isMobilesSearch = (query.includes('mobile') || query.includes('phone') || query.includes('smartphone')) && 
+        (product.category?.toLowerCase().includes('mobile') || product.category?.toLowerCase().includes('phone'));
+      const isWatchesSearch = (query.includes('watch') || query.includes('smart watch')) && 
+        product.category?.toLowerCase().includes('watch');
+      const isTvsSearch = (query.includes('tv') || query.includes('television')) && 
+        product.category?.toLowerCase().includes('tv');
+      const isFridgesSearch = (query.includes('fridge') || query.includes('refrigerator')) && 
+        product.category?.toLowerCase().includes('fridge');
+      const isWashingMachinesSearch = (query.includes('washing') || query.includes('machine')) && 
+        product.category?.toLowerCase().includes('washing');
+      const isEarphonesSearch = (query.includes('earphone') || query.includes('earbud') || query.includes('headphone')) && 
+        (product.category?.toLowerCase().includes('earphone') || product.category?.toLowerCase().includes('earbud'));
+      
+      return nameMatch || descriptionMatch || categoryMatch || 
+             isBestSellersSearch || isNewReleasesSearch ||
+             isLaptopsSearch || isMobilesSearch || isWatchesSearch || 
+             isTvsSearch || isFridgesSearch || isWashingMachinesSearch || isEarphonesSearch;
+    });
   }, [products, searchQuery]);
 
   const featuredProducts = (searchQuery ? filteredProducts : products).filter(product => product.isFeatured).slice(0, 8);
